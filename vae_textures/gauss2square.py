@@ -1,12 +1,35 @@
-from functools import partial
 from typing import Callable
 
 import jax
+import jax.lax as lax
 import jax.numpy as jnp
-from jax.scipy.special import erf
+import numpy as np
 
 
-def pred_xstart(x_t: jnp.ndarray, alpha: jnp.ndarray):
+@jax.jit
+def sample_ddim(x_T: jnp.ndarray):
+    """
+    Map normal random variables to uniform random variables.
+    """
+
+    def sample_it(x_t, alphas):
+        alpha_prev, alpha_next = alphas[0], alphas[1]
+        x_0 = pred_x0(x_t, alpha_prev)
+        eps = (x_t - jnp.sqrt(alpha_prev) * x_0) / jnp.sqrt(1 - alpha_prev)
+        x_t = jnp.sqrt(alpha_next) * x_0 + jnp.sqrt(1 - alpha_next) * eps
+        return x_t, None
+
+    alphas = jnp.exp(-(jnp.linspace(0, 4, num=50)[::-1] ** 2))
+    joined = jnp.stack([alphas[:-1], alphas[1:]], axis=-1)
+    x_0, _ = lax.scan(sample_it, x_T, joined)
+    return x_0
+
+
+def pred_x0(x_t: jnp.ndarray, alpha: jnp.ndarray):
+    """
+    Compute the exact prediction E[q(x_0|x_t,alpha)] assuming that q(x_0) is
+    the uniform distribution.
+    """
     # x_t = x_0*sqrt(alpha) + z*sqrt(1-alpha)
     # p(x_0 | x_t) = p(x_t | x_0) p(x_0) / p(x_t)
     # E[x_0 | x_t] = integral over x_0 of x_0 * p(x_0 | x_t)
@@ -46,9 +69,11 @@ def _definite_integral(f: Callable[[jnp.ndarray], jnp.ndarray]) -> jnp.ndarray:
 
 
 if __name__ == "__main__":
-    xs = jnp.linspace(-10, 10, num=50)
-    ys = pred_xstart(xs, jnp.array([0.5] * 50))
+    key = jax.random.PRNGKey(1337)
+    xs = jax.random.normal(key, shape=(10000, 2))
+    ys = sample_ddim(xs)
+
     import matplotlib.pyplot as plt
 
-    plt.plot(xs, ys)
+    plt.scatter(ys[:, 0], ys[:, 1])
     plt.show()

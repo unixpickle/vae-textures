@@ -6,7 +6,7 @@ The plan:
 
  * For a given 3D model, create a "surface dataset" with random points on the surface and their respective normals.
  * Train a VAE to generate points on the surface using a 2D Gaussian latent space. Possibly add a conformality term to the loss to encourage orthogonal directions on the surface to be orthogonal in latent space.
- * Implement an exact denoising diffusion model for mapping points on a 2D gaussian to the unit square. Distill the mapping implied by DDIM into a small model.
+ * Implement an exact denoising diffusion model for mapping points on a 2D gaussian to the unit square. Distill the mapping implied by DDIM into a small model. *(Changed my mind on this last part, DDIM is fast enough.)*
  * Apply the 3D -> 2D mapping from above to map the vertices of the original mesh to the unit square, and render the resulting model with some test 2D texture image.
 
 Some immediately obvious limitations:
