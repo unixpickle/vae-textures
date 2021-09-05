@@ -1,5 +1,9 @@
+from functools import partial
+from typing import Callable
+
 import jax
 import jax.numpy as jnp
+from jax.scipy.special import erf
 
 
 def pred_xstart(x_t: jnp.ndarray, alpha: jnp.ndarray):
@@ -19,49 +23,32 @@ def pred_xstart(x_t: jnp.ndarray, alpha: jnp.ndarray):
 
 def _normal_expectation_uniform(x_t: jnp.ndarray, a: jnp.ndarray, k: jnp.ndarray):
     """
-    Compute integral from x=-1 to x=1 of x * x*exp(-0.5*(a*x - x_t)^2/k) dx
+    Compute integral from x=-1 to x=1 of x*exp(-0.5*(a*x - x_t)^2/k) dx
     """
-    one = jnp.ndarray(1)
-    f1 = _normal_expectation_indef(one, x_t, a, k)
-    f0 = _normal_expectation_indef(-one, x_t, a, k)
-    return f1 - f0
-
-
-def _normal_expectation_indef(
-    x: jnp.ndarray, x_t: jnp.ndarray, a: jnp.ndarray, k: jnp.ndarray
-):
-    """
-    Indefinite integral of x*exp(-0.5*(a*x - x_t)^2/k) dx
-    """
-    return -(
-        jnp.sqrt(k * jnp.pi / 2)
-        * x_t
-        * jnp.scipy.special.erf(jnp.sqrt(0.5) * (x_t - a * x) / jnp.sqrt(k))
-        + k * jnp.exp(-(0.5 * (x_t - a * x) ** 2) / k)
-    ) / (a ** 2)
+    return _definite_integral(
+        f=lambda x: x * jnp.exp(-0.5 * (a * x - x_t) ** 2 / k),
+    )
 
 
 def _normal_integral_uniform(x_t: jnp.ndarray, a: jnp.ndarray, k: jnp.ndarray):
     """
     Compute integral from x=-1 to x=1 of exp(-0.5*(a*x - x_t)^2/k) dx
     """
-    one = jnp.ndarray(1)
-    f1 = _normal_integral_indef(one, x_t, a, k)
-    f0 = _normal_integral_indef(-one, x_t, a, k)
-    return f1 - f0
-
-
-def _normal_integral_indef(
-    x: jnp.ndarray, x_t: jnp.ndarray, a: jnp.ndarray, k: jnp.ndarray
-):
-    """
-    Indefinite integral of exp(-0.5*(a*x - x_t)^2/k) dx
-    """
-    return (
-        -(
-            jnp.sqrt(jnp.pi / 2)
-            * jnp.sqrt(k)
-            * jnp.scipy.special.erf(jnp.sqrt(0.5) * (x_t - a * x) / jnp.sqrt(k))
-        )
-        / a
+    return _definite_integral(
+        f=lambda x: jnp.exp(-0.5 * (a * x - x_t) ** 2 / k),
     )
+
+
+def _definite_integral(f: Callable[[jnp.ndarray], jnp.ndarray]) -> jnp.ndarray:
+    xs = jnp.linspace(-1, 1, num=200)
+    ys = jax.vmap(f)(xs)
+    return jnp.trapz(ys, xs, axis=0)
+
+
+if __name__ == "__main__":
+    xs = jnp.linspace(-10, 10, num=50)
+    ys = pred_xstart(xs, jnp.array([0.5] * 50))
+    import matplotlib.pyplot as plt
+
+    plt.plot(xs, ys)
+    plt.show()
