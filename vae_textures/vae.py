@@ -1,6 +1,10 @@
+from typing import Any, Dict, Iterable, Tuple
+
 import flax.linen as nn
+from flax.training import train_state
 import jax
 import jax.numpy as jnp
+import optax
 
 
 class GaussianSIREN(nn.Module):
@@ -51,3 +55,39 @@ class VAE(nn.Module):
             )
         )
         return kl_loss + recon_loss
+
+
+def train(data_iter: Iterable[jnp.ndarray]) -> Dict[str, Any]:
+    vae = VAE()
+    init_rng, noise_rng = jax.random.split(jax.random.PRNGKey(1234))
+    var_dict = jax.jit(vae.init)(
+        dict(params=init_rng, latent_noise=noise_rng), next(iter(data_iter))
+    )
+    state = train_state.TrainState.create(
+        apply_fn=vae.apply,
+        params=var_dict["params"],
+        tx=optax.adam(1e-3),
+    )
+    losses = []
+    for i, batch in enumerate(data_iter):
+        loss, state, noise_rng = train_step(state, noise_rng, batch)
+        losses.append(loss.tolist())
+        if len(losses) == 100:
+            print(f"step {i}: loss={sum(losses)/len(losses):.05f}")
+            losses = []
+    if len(losses):
+        print(f"step {i}: loss={sum(losses)/len(losses):.05f}")
+    return state.params
+
+
+@jax.jit
+def train_step(
+    state: train_state.TrainState, rng: jax.random.PRNGKey, batch: jnp.ndarray
+) -> Tuple[jnp.ndarray, train_state.TrainState, jax.random.PRNGKey]:
+    rng, new_rng = jax.random.split(rng)
+    loss, grads = jax.value_and_grad(
+        lambda params: VAE().apply(
+            dict(params=params), batch, rngs=dict(latent_noise=rng)
+        )
+    )(state.params)
+    return loss, state.apply_gradients(grads=grads), new_rng
