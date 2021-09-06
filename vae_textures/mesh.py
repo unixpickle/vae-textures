@@ -63,7 +63,7 @@ def mesh_sampler(mesh: jnp.ndarray) -> Callable[[jax.random.PRNGKey, int], jnp.n
         v2 = t[2] - t[0]
         # Cross product.
         c1 = v1[1] * v2[2] - v2[1] * v1[2]
-        c2 = -(v1[0] * v2[2] - v2[0] * v2[2])
+        c2 = -(v1[0] * v2[2] - v2[0] * v1[2])
         c3 = v1[0] * v2[1] - v2[0] * v1[1]
         return jnp.sqrt(c1 ** 2 + c2 ** 2 + c3 ** 2) / 2
 
