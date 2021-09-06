@@ -2,7 +2,9 @@
 
 This is an experiment with using variational autoencoders (VAEs) to perform [mesh parameterization](https://en.wikipedia.org/wiki/Mesh_parameterization). This was also my first project using [JAX](https://github.com/google/jax) and [Flax](https://github.com/google/flax), and I found them both quite intuitive and easy to use.
 
-<img src="outputs/renders/torus_no_ortho.png" height="200">
+<p align="center">
+    <img src="outputs/renders/torus_no_ortho.png" height="200">
+</p>
 
 # The plan
 
