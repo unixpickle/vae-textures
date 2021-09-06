@@ -2,7 +2,7 @@
 
 This is an experiment with using variational autoencoders (VAEs) to perform [mesh parameterization](https://en.wikipedia.org/wiki/Mesh_parameterization).
 
-![Rendering of a torus with a checkerboard texture mapped onto it](outputs/renders/torus_no_ortho.png)
+<img src="outputs/renders/torus_no_ortho.png" height="200">
 
 # The plan
 
