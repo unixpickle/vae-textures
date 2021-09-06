@@ -40,8 +40,6 @@ class VAE(nn.Module):
         """
         xs = coords_and_basis[:, 0]
 
-        # TODO: use basis for angle-preservation bonus
-
         mean, log_stddev = self.encoder(xs)
         latent_noise = jax.random.normal(
             self.make_rng("latent_noise"), shape=log_stddev.shape
