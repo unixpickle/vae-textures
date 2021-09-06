@@ -12,6 +12,7 @@ def main():
     parser.add_argument("--num-iters", default=1000, type=int)
     parser.add_argument("--save-path", default="vae.pkl", type=str)
     parser.add_argument("--batch-size", default=100, type=int)
+    parser.add_argument("--ortho-loss", default=0.0, type=float)
     parser.add_argument("mesh_path", type=str)
     args = parser.parse_args()
 
@@ -26,7 +27,7 @@ def main():
             samples = sampler(use_key)
             yield samples
 
-    params = train(data_fn())
+    params = train(data_fn(), args.ortho_loss)
     with open(args.save_path, "wb") as f:
         pickle.dump(params, f)
 

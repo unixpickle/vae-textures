@@ -68,14 +68,19 @@ class VAE(nn.Module):
 
             _, diff_1 = jax.jvp(uniform_point, (xs,), (coords_and_basis[:, 1],))
             _, diff_2 = jax.jvp(uniform_point, (xs,), (coords_and_basis[:, 2],))
-            dists = jax.vmap(_cosine_distance)(diff_1, diff_2)
-            return kl_loss + recon_loss + self.ortho_loss * jnp.mean(dists)
+            losses = jax.vmap(_ortho_loss)(diff_1, diff_2)
+            return kl_loss + recon_loss + self.ortho_loss * jnp.mean(losses)
 
         return kl_loss + recon_loss
 
 
-def _cosine_distance(v1, v2):
-    return jnp.dot(v1, v2) / (jnp.sqrt(jnp.dot(v1, v1)) * jnp.sqrt(jnp.dot(v2, v2)))
+def _ortho_loss(v1, v2):
+    matrix = jnp.stack([v1, v2])
+    eigs = jnp.linalg.eigvalsh(matrix.T @ matrix)
+    return jnp.abs(eigs[0] - eigs[1])
+    # This objective is the actual condition number, but appears
+    # to be relatively unstable.
+    # return jnp.maximum(eigs[0], eigs[1]) / jnp.minimum(eigs[0], eigs[1])
 
 
 def train(data_iter: Iterable[jnp.ndarray], ortho_loss: float) -> Dict[str, Any]:
