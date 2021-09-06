@@ -22,7 +22,7 @@ Some immediately obvious limitations:
 
 This was my first time using JAX. Nevertheless, I was able to get interesting results right out of the gate.
 
-Here is a torus with no orthogonality bonus, with the :
+Here is a torus with no orthogonality bonus:
 
 ![Torus with no bonus](outputs/renders/torus_no_ortho.png)
 
