@@ -34,7 +34,9 @@ class VAE(nn.Module):
         self.encoder = GaussianSIREN(2)
         self.decoder = GaussianSIREN(3)
 
-    def __call__(self, coords_and_basis):
+    def __call__(
+        self, coords_and_basis: jnp.ndarray
+    ) -> Tuple[jnp.ndarray, Dict[str, jnp.ndarray]]:
         """
         Compute the variational lower-bound for encoding and decoding xs.
         """
@@ -58,6 +60,12 @@ class VAE(nn.Module):
             )
         )
 
+        info_dict = dict(
+            recon_loss=recon_loss,
+            kl_loss=kl_loss,
+            mse=jnp.mean((dec_mean - xs) ** 2),
+        )
+
         if self.ortho_loss:
 
             def uniform_point(xs):
@@ -66,10 +74,11 @@ class VAE(nn.Module):
 
             _, diff_1 = jax.jvp(uniform_point, (xs,), (coords_and_basis[:, 1],))
             _, diff_2 = jax.jvp(uniform_point, (xs,), (coords_and_basis[:, 2],))
-            losses = jax.vmap(_ortho_loss)(diff_1, diff_2)
-            return kl_loss + recon_loss + self.ortho_loss * jnp.mean(losses)
+            ortho_loss = jnp.mean(jax.vmap(_ortho_loss)(diff_1, diff_2))
+            info_dict["ortho_loss"] = ortho_loss
+            return kl_loss + recon_loss + self.ortho_loss * ortho_loss, info_dict
 
-        return kl_loss + recon_loss
+        return kl_loss + recon_loss, info_dict
 
 
 def _ortho_loss(v1, v2):
@@ -94,24 +103,36 @@ def train(data_iter: Iterable[jnp.ndarray], ortho_loss: float) -> Dict[str, Any]
     )
     step_fn = jax.jit(partial(train_step, vae))
     losses = []
+    infos = []
+
+    def print_step(i):
+        keys = [f"loss={sum(losses)/len(losses):.05f}"]
+        for k in infos[0].keys():
+            vs = [x[k] for x in infos]
+            keys.append(f"{k}={sum(vs)/len(vs):.05f}")
+        print(f"step {i+1}: {' '.join(keys)}")
+        losses.clear()
+        infos.clear()
+
     for i, batch in enumerate(data_iter):
-        loss, state, noise_rng = step_fn(state, noise_rng, batch)
+        noise_rng, cur_noise_rng = jax.random.split(noise_rng)
+        (loss, info), state = step_fn(state, cur_noise_rng, batch)
         losses.append(loss.tolist())
+        infos.append({k: v.tolist() for k, v in info.items()})
         if len(losses) == 100:
-            print(f"step {i}: loss={sum(losses)/len(losses):.05f}")
-            losses = []
+            print_step(i)
     if len(losses):
-        print(f"step {i}: loss={sum(losses)/len(losses):.05f}")
+        print_step(i)
     return state.params
 
 
 def train_step(
     vae: VAE, state: train_state.TrainState, rng: jax.random.PRNGKey, batch: jnp.ndarray
-) -> Tuple[jnp.ndarray, train_state.TrainState, jax.random.PRNGKey]:
-    rng, new_rng = jax.random.split(rng)
-    loss, grads = jax.value_and_grad(
+) -> Tuple[Tuple[jnp.ndarray, Dict[str, jnp.ndarray]], train_state.TrainState]:
+    loss_aux, grads = jax.value_and_grad(
         lambda params: vae.apply(
             dict(params=params), batch, rngs=dict(latent_noise=rng)
-        )
+        ),
+        has_aux=True,
     )(state.params)
-    return loss, state.apply_gradients(grads=grads), new_rng
+    return loss_aux, state.apply_gradients(grads=grads)
