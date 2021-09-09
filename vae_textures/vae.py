@@ -28,7 +28,9 @@ class GaussianSIREN(nn.Module):
 
 
 class VAE(nn.Module):
-    ortho_loss: float
+    ortho_coeff: float
+    kl_coeff: float
+    recon_mse: bool
 
     def setup(self):
         self.encoder = GaussianSIREN(2)
@@ -49,11 +51,17 @@ class VAE(nn.Module):
         latent_sample = mean + latent_noise * jnp.exp(log_stddev)
         dec_mean, dec_log_stddev = self.decoder(latent_sample)
 
-        recon_loss = -jnp.mean(
-            jax.vmap(
-                lambda x, m, s: jnp.sum(jax.scipy.stats.norm.logpdf(x, loc=m, scale=s))
-            )(xs, dec_mean, jnp.exp(dec_log_stddev))
-        )
+        if self.recon_mse:
+            recon_loss = jnp.mean(jnp.sum((xs - dec_mean) ** 2, axis=-1))
+        else:
+            recon_loss = -jnp.mean(
+                jax.vmap(
+                    lambda x, m, s: jnp.sum(
+                        jax.scipy.stats.norm.logpdf(x, loc=m, scale=s)
+                    )
+                )(xs, dec_mean, jnp.exp(dec_log_stddev))
+            )
+
         kl_loss = jnp.mean(
             jax.vmap(lambda m, s: -0.5 * jnp.sum(1 + 2 * s - m ** 2 - jnp.exp(2 * s)))(
                 mean, log_stddev
@@ -66,7 +74,9 @@ class VAE(nn.Module):
             mse=jnp.mean((dec_mean - xs) ** 2),
         )
 
-        if self.ortho_loss:
+        loss = recon_loss + self.kl_coeff * kl_loss
+
+        if self.ortho_coeff:
 
             def uniform_point(xs):
                 mean, _ = self.encoder(xs)
@@ -76,9 +86,9 @@ class VAE(nn.Module):
             _, diff_2 = jax.jvp(uniform_point, (xs,), (coords_and_basis[:, 2],))
             ortho_loss = jnp.mean(jax.vmap(_ortho_loss)(diff_1, diff_2))
             info_dict["ortho_loss"] = ortho_loss
-            return kl_loss + recon_loss + self.ortho_loss * ortho_loss, info_dict
+            loss = loss + self.ortho_coeff * ortho_loss
 
-        return kl_loss + recon_loss, info_dict
+        return loss, info_dict
 
 
 def _ortho_loss(v1, v2):
@@ -90,8 +100,14 @@ def _ortho_loss(v1, v2):
     # return jnp.maximum(eigs[0], eigs[1]) / jnp.minimum(eigs[0], eigs[1])
 
 
-def train(data_iter: Iterable[jnp.ndarray], ortho_loss: float) -> Dict[str, Any]:
-    vae = VAE(ortho_loss)
+def train(
+    data_iter: Iterable[jnp.ndarray],
+    lr: float = 1e-3,
+    ortho_coeff: float = 0.0,
+    kl_coeff: float = 1.0,
+    recon_mse: bool = False,
+) -> Dict[str, Any]:
+    vae = VAE(ortho_coeff=ortho_coeff, kl_coeff=kl_coeff, recon_mse=recon_mse)
     init_rng, noise_rng = jax.random.split(jax.random.PRNGKey(1234))
     var_dict = jax.jit(vae.init)(
         dict(params=init_rng, latent_noise=noise_rng), next(iter(data_iter))
@@ -99,7 +115,7 @@ def train(data_iter: Iterable[jnp.ndarray], ortho_loss: float) -> Dict[str, Any]
     state = train_state.TrainState.create(
         apply_fn=vae.apply,
         params=var_dict["params"],
-        tx=optax.adam(1e-3),
+        tx=optax.adam(lr),
     )
     step_fn = jax.jit(partial(train_step, vae))
     losses = []
