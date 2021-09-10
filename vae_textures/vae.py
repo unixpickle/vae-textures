@@ -2,10 +2,10 @@ from functools import partial
 from typing import Any, Dict, Iterable, Tuple
 
 import flax.linen as nn
-from flax.training import train_state
 import jax
 import jax.numpy as jnp
 import optax
+from flax.training import train_state
 
 from .uniform import gauss_to_uniform
 
@@ -16,9 +16,17 @@ class GaussianSIREN(nn.Module):
     @nn.compact
     def __call__(self, xs):
         # SIREN layers: https://vsitzmann.github.io/siren/
-        h = nn.Dense(128)(xs)
+        input_init = partial(
+            nn.initializers.variance_scaling, 2.0 * 30.0 ** 2.0, "fan_in", "uniform"
+        )
+        mid_layer_init = partial(
+            nn.initializers.variance_scaling, 2.0, "fan_in", "uniform"
+        )
+        h = nn.Dense(128, kernel_init=input_init(), bias_init=nn.initializers.normal())(
+            xs
+        )
         h = jnp.sin(h)
-        h = nn.Dense(128)(h)
+        h = nn.Dense(128, kernel_init=mid_layer_init())(h)
         h = jnp.sin(h)
         # Regular dense layers.
         h = nn.Dense(128)(h)
@@ -106,9 +114,10 @@ def train(
     ortho_coeff: float = 0.0,
     kl_coeff: float = 1.0,
     recon_mse: bool = False,
+    init_seed: int = 1234,
 ) -> Dict[str, Any]:
     vae = VAE(ortho_coeff=ortho_coeff, kl_coeff=kl_coeff, recon_mse=recon_mse)
-    init_rng, noise_rng = jax.random.split(jax.random.PRNGKey(1234))
+    init_rng, noise_rng = jax.random.split(jax.random.PRNGKey(init_seed))
     var_dict = jax.jit(vae.init)(
         dict(params=init_rng, latent_noise=noise_rng), next(iter(data_iter))
     )

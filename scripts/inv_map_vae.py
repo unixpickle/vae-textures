@@ -1,13 +1,12 @@
 import argparse
 import pickle
 
-from PIL import Image
 import jax
 import jax.numpy as jnp
 import numpy as np
-
+from PIL import Image
+from vae_textures.mesh import read_stl
 from vae_textures.uniform import uniform_to_gauss
-from vae_textures.mesh import read_stl, write_material_obj
 from vae_textures.vae import GaussianSIREN
 
 
@@ -15,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--vae-path", default="vae.pkl", type=str)
     parser.add_argument("--resolution", default=256, type=int)
+    parser.add_argument("--batch-size", default=128, type=int)
     parser.add_argument("mesh_in", type=str)
     parser.add_argument("img_out", type=str)
     args = parser.parse_args()
@@ -32,8 +32,8 @@ def main():
     points = jnp.array([[x, y] for y in stops for x in stops])
 
     out_points = []
-    for i in range(0, len(points), 100):
-        spatial_point = dec(uniform_to_gauss(points[i : i + 100]))
+    for i in range(0, len(points), args.batch_size):
+        spatial_point = dec(uniform_to_gauss(points[i : i + args.batch_size]))
         constrained = jnp.clip(
             (spatial_point - min_coord) / (max_coord - min_coord), 0, 1
         )
