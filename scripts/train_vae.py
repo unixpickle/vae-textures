@@ -12,6 +12,8 @@ def main():
     parser.add_argument("--num-iters", default=1000, type=int)
     parser.add_argument("--save-path", default="vae.pkl", type=str)
     parser.add_argument("--batch-size", default=100, type=int)
+    parser.add_argument("--data-seed", default=1, type=int)
+    parser.add_argument("--init-seed", default=2, type=int)
     parser.add_argument("--lr", default=1e-3, type=float)
     parser.add_argument("--ortho-coeff", default=0.0, type=float)
     parser.add_argument("--kl-coeff", default=1.0, type=float)
@@ -24,7 +26,7 @@ def main():
     sampler = jax.jit(lambda x: raw_sampler(x, args.batch_size))
 
     def data_fn():
-        key = jax.random.PRNGKey(1)
+        key = jax.random.PRNGKey(args.data_seed)
         for _ in range(args.num_iters + 1):
             use_key, key = jax.random.split(key)
             samples = sampler(use_key)
@@ -36,6 +38,7 @@ def main():
         ortho_coeff=args.ortho_coeff,
         kl_coeff=args.kl_coeff,
         recon_mse=args.recon_mse,
+        init_seed=args.init_seed,
     )
     with open(args.save_path, "wb") as f:
         pickle.dump(params, f)
