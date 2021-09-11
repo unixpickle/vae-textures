@@ -22,6 +22,24 @@ def read_stl(path: str) -> jnp.ndarray:
     return tris.reshape([-1, 3, 3])
 
 
+def write_plain_obj(
+    path: str,
+    mesh: jnp.ndarray,
+):
+    """
+    Write an obj file with a mesh, represented as an [N x 3 x 3] array.
+    """
+    vertex_strs = [
+        f"v {x:.5f} {y:.5f} {z:.5f}" for x, y, z in mesh.reshape([-1, 3]).tolist()
+    ]
+    face_strs = [
+        f"f {i*3+1}/{i*3+1} {i*3+2}/{i*3+2} {i*3+3}/{i*3+3}" for i in range(len(mesh))
+    ]
+    with open(path, "w") as f:
+        f.write("\n".join(vertex_strs) + "\n")
+        f.write("\n".join(face_strs) + "\n")
+
+
 def write_material_obj(
     path: str,
     mesh: jnp.ndarray,
