@@ -16,17 +16,13 @@ class GaussianSIREN(nn.Module):
     @nn.compact
     def __call__(self, xs):
         # SIREN layers: https://vsitzmann.github.io/siren/
-        input_init = partial(
-            nn.initializers.variance_scaling, 2.0 * 30.0 ** 2.0, "fan_in", "uniform"
-        )
-        mid_layer_init = partial(
-            nn.initializers.variance_scaling, 2.0, "fan_in", "uniform"
-        )
-        h = nn.Dense(128, kernel_init=input_init(), bias_init=nn.initializers.normal())(
-            xs
+        siren_init = partial(nn.initializers.variance_scaling, 2.0, "fan_in", "uniform")
+        h = nn.Dense(128, kernel_init=siren_init(), use_bias=False)(xs)
+        h = h + self.param(
+            "input_phase", nn.initializers.uniform(scale=jnp.pi * 2), (128,)
         )
         h = jnp.sin(h)
-        h = nn.Dense(128, kernel_init=mid_layer_init())(h)
+        h = nn.Dense(128, kernel_init=siren_init())(h)
         h = jnp.sin(h)
         # Regular dense layers.
         h = nn.Dense(128)(h)
