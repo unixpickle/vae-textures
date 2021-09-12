@@ -26,11 +26,13 @@ Initially, I trained VAEs with a Gaussian loss on the decoder, and played around
 
 ![Torus with bonus](outputs/renders/torus_ortho.png)
 
-The above picture looks like a clean mapping, but something is wrong. To see why, let's sample from this VAE. In particular, we will map uniformly spaced points on the texture back to 3D space. In this case I'll use the mean prediction from the decoder, even though its output is a Gaussian distribution:
+The above picture looks like a clean mapping, but something is wrong. To see why, let's sample from this VAE; if it works, we should get points on the surface of the torus. For this "sampling", I'll use the mean prediction from the decoder, even though its output is a Gaussian distribution, since in the end we want a deterministic mapping:
 
 ![A flat disk with a hole in the middle](outputs/renders/torus_sample.png)
 
-It might be hard to tell from a single rendering, but this is just a flat disk with a hole in the middle. In particular, the VAE isn't encoding the z axis (i.e. thickness) at all, but rather just the x and y axes. I discovered that this caused by the Gaussian likelihood loss on the decoder. It is possible for the model to reduce this loss arbitrarily by shrinking the standard deviations of the x and y axes, so there is little incentive to actually capture every axis accurately.
+It might be hard to tell from a single rendering, but this is just a flat disk with a hole in the middle. In particular, the VAE isn't encoding the z axis at all, but rather just the x and y axes. The resulting texture map looks smooth, but every point in the texture is reused on each side of the torus.
+
+I discovered that this caused by the Gaussian likelihood loss on the decoder. It is possible for the model to reduce this loss arbitrarily by shrinking the standard deviations of the x and y axes, so there is little incentive to actually capture every axis accurately.
 
 To achieve better results, we can drop the Gaussian likelihood loss and instead use pure MSE for the decoder. This isn't super well-principled, and we now have to select a reasonable coefficient for the KL term of the VAE to balance the reconstruction accuracy with the quality of the latent distribution. I found good hyperparameters for the torus, but these won't necessarily generalize.
 
@@ -74,7 +76,7 @@ You can also sample a point cloud from the VAE using `point_cloud_gen.py`:
 python scripts/point_cloud_gen.py outputs/point_cloud.obj
 ```
 
-Finally, you can sample a texture mapping such that points on the texture are normalized (x,y,z) coordinates encoded as RGB:
+Finally, you can produce a texture image such that points on the texture are RGB-encoded normalized (x,y,z) from the corresponding 3D model:
 
 ```shell
 python scripts/inv_map_vae.py models/torus.stl outputs/rgb_texture.png
