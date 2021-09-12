@@ -34,7 +34,8 @@ class GaussianSIREN(nn.Module):
 class VAE(nn.Module):
     ortho_coeff: float
     kl_coeff: float
-    recon_mse: bool
+    ortho_loss_fn: str
+    recon_loss_fn: str
 
     def setup(self):
         self.encoder = GaussianSIREN(2)
@@ -55,27 +56,13 @@ class VAE(nn.Module):
         latent_sample = mean + latent_noise * jnp.exp(log_stddev)
         dec_mean, dec_log_stddev = self.decoder(latent_sample)
 
-        if self.recon_mse:
-            recon_loss = jnp.mean(jnp.sum((xs - dec_mean) ** 2, axis=-1))
-        else:
-            recon_loss = -jnp.mean(
-                jax.vmap(
-                    lambda x, m, s: jnp.sum(
-                        jax.scipy.stats.norm.logpdf(x, loc=m, scale=s)
-                    )
-                )(xs, dec_mean, jnp.exp(dec_log_stddev))
-            )
-
-        kl_loss = jnp.mean(
-            jax.vmap(lambda m, s: -0.5 * jnp.sum(1 + 2 * s - m ** 2 - jnp.exp(2 * s)))(
-                mean, log_stddev
-            )
-        )
+        recon_loss = _recon_loss(self.recon_loss_fn, xs, dec_mean, dec_log_stddev)
+        kl_loss = _kl_loss(mean, log_stddev)
 
         info_dict = dict(
             recon_loss=recon_loss,
             kl_loss=kl_loss,
-            mse=jnp.mean((dec_mean - xs) ** 2),
+            mse=jnp.mean(jnp.sum((dec_mean - xs) ** 2, axis=-1)),
         )
 
         loss = recon_loss + self.kl_coeff * kl_loss
@@ -88,20 +75,50 @@ class VAE(nn.Module):
 
             _, diff_1 = jax.jvp(uniform_point, (xs,), (coords_and_basis[:, 1],))
             _, diff_2 = jax.jvp(uniform_point, (xs,), (coords_and_basis[:, 2],))
-            ortho_loss = jnp.mean(jax.vmap(_ortho_loss)(diff_1, diff_2))
+            ortho_loss = jnp.mean(
+                jax.vmap(partial(_ortho_loss, self.ortho_loss_fn))(diff_1, diff_2)
+            )
             info_dict["ortho_loss"] = ortho_loss
             loss = loss + self.ortho_coeff * ortho_loss
 
         return loss, info_dict
 
 
-def _ortho_loss(v1, v2):
+def _ortho_loss(name, v1, v2):
     matrix = jnp.stack([v1, v2])
     eigs = jnp.linalg.eigvalsh(matrix.T @ matrix)
-    return jnp.abs(eigs[0] - eigs[1])
-    # This objective is the actual condition number, but appears
-    # to be relatively unstable.
-    # return jnp.maximum(eigs[0], eigs[1]) / jnp.minimum(eigs[0], eigs[1])
+    e1, e2 = eigs[0], eigs[1]
+    if name == "abs":
+        return jnp.abs(e1 - e2)
+    elif name == "rel":
+        return 1 - jnp.minimum(e1, e2) / jnp.maximum(e1, e2)
+    elif name == "condnum":
+        # This objective is the actual condition number, but appears
+        # to be relatively unstable.
+        return jnp.maximum(e1, e2) / jnp.minimum(e1, e2)
+    else:
+        raise ValueError(f"unknown ortho loss function: {name}")
+
+
+def _recon_loss(name, xs, mean, log_stddev):
+    if name == "mse":
+        return jnp.mean(jnp.sum((xs - mean) ** 2, axis=-1))
+    elif name == "gaussian":
+        return -jnp.mean(
+            jax.vmap(
+                lambda x, m, s: jnp.sum(jax.scipy.stats.norm.logpdf(x, loc=m, scale=s))
+            )(xs, mean, jnp.exp(log_stddev))
+        )
+    else:
+        raise ValueError(f"unknown reconstruction loss function: {name}")
+
+
+def _kl_loss(mean, log_stddev):
+    return jnp.mean(
+        jax.vmap(lambda m, s: -0.5 * jnp.sum(1 + 2 * s - m ** 2 - jnp.exp(2 * s)))(
+            mean, log_stddev
+        )
+    )
 
 
 def train(
@@ -109,10 +126,16 @@ def train(
     lr: float = 1e-3,
     ortho_coeff: float = 0.0,
     kl_coeff: float = 1.0,
-    recon_mse: bool = False,
+    recon_loss_fn: str = "gaussian",
+    ortho_loss_fn: str = "abs",
     init_seed: int = 1234,
 ) -> Dict[str, Any]:
-    vae = VAE(ortho_coeff=ortho_coeff, kl_coeff=kl_coeff, recon_mse=recon_mse)
+    vae = VAE(
+        ortho_coeff=ortho_coeff,
+        kl_coeff=kl_coeff,
+        recon_loss_fn=recon_loss_fn,
+        ortho_loss_fn=ortho_loss_fn,
+    )
     init_rng, noise_rng = jax.random.split(jax.random.PRNGKey(init_seed))
     var_dict = jax.jit(vae.init)(
         dict(params=init_rng, latent_noise=noise_rng), next(iter(data_iter))
