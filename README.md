@@ -12,7 +12,7 @@ To get straight to the results, check out the [Results](#results) section. The [
 
 In geometry processing, mesh parameterization allows high-resolution details of a 3D object, such as color and material variations, to be stored in a highly-optimized 2D image format. The strategy is to map each vertex of the 3D model's mesh to a unique 2D location in the plane, with the constraint that nearby points in 3D are also nearby in 2D. In general, we want this mapping to distort the geometry of the surface as little as possible, so for example large features on the 3D surface get a lot of pixels in the 2D image.
 
-This might sound familiar to those familiar with machine learning. In ML, mapping a higher-dimensional space to a lower-dimensional space is called "embedding" and is often performed to aid in visualization or to remove extraneous information. VAEs are one technique in ML for mapping a high-dimensional space to a well-behaved latent space, and have the desirable property that probability densities are (approximately) preserved between the two spaces.
+This might ring a bell to those familiar with machine learning. In ML, mapping a higher-dimensional space to a lower-dimensional space is called "embedding" and is often performed to aid in visualization or to remove extraneous information. VAEs are one technique in ML for mapping a high-dimensional space to a well-behaved latent space, and have the desirable property that probability densities are (approximately) preserved between the two spaces.
 
 Given the above observations, here is how we can use VAEs for mesh parameterization:
 
