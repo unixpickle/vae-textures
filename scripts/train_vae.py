@@ -19,10 +19,11 @@ def main():
     parser.add_argument("--kl-coeff", default=1.0, type=float)
     parser.add_argument("--recon-loss-fn", default="gaussian", type=str)
     parser.add_argument("--ortho-loss-fn", default="abs", type=str)
+    parser.add_argument("--preserve-coords", action="store_true")
     parser.add_argument("mesh_path", type=str)
     args = parser.parse_args()
 
-    mesh = read_stl(args.mesh_path)
+    mesh = read_stl(args.mesh_path, normalize=not args.preserve_coords)
     raw_sampler = mesh_sampler(mesh)
     sampler = jax.jit(lambda x: raw_sampler(x, args.batch_size))
 

@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 
-def read_stl(path: str) -> jnp.ndarray:
+def read_stl(path: str, normalize: bool = False) -> jnp.ndarray:
     """
     Read a 3D model triangle mesh from an STL file.
 
@@ -19,7 +19,22 @@ def read_stl(path: str) -> jnp.ndarray:
         tri_data = f.read(tri_size * num_tris)
         assert len(tri_data) == tri_size * num_tris
     tris = jnp.array([x[3:-1] for x in struct.iter_unpack(f"<{'f'*12}h", tri_data)])
-    return tris.reshape([-1, 3, 3])
+    out = tris.reshape([-1, 3, 3])
+    if normalize:
+        out = normalize_mesh(out)
+    return out
+
+
+def normalize_mesh(mesh: jnp.ndarray) -> jnp.ndarray:
+    """
+    Center the mesh and scale its bounding box to have no coordinates greater
+    than absolute value 1.
+    """
+    min_point = jnp.min(mesh, axis=(0, 1))
+    max_point = jnp.max(mesh, axis=(0, 1))
+    mesh = mesh - (min_point + max_point) / 2
+    mesh = 2 * mesh / jnp.max(max_point - min_point)
+    return mesh
 
 
 def write_plain_obj(

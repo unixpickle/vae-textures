@@ -15,11 +15,13 @@ def main():
     parser.add_argument("--vae-path", default="vae.pkl", type=str)
     parser.add_argument("--resolution", default=256, type=int)
     parser.add_argument("--batch-size", default=128, type=int)
+    parser.add_argument("--preserve-coords", action="store_true")
     parser.add_argument("mesh_in", type=str)
     parser.add_argument("img_out", type=str)
     args = parser.parse_args()
 
-    mesh = read_stl(args.mesh_in)
+    mesh = read_stl(args.mesh_in, normalize=not args.preserve_coords)
+
     min_coord = jnp.min(mesh.reshape([-1, 3]), axis=0)
     max_coord = jnp.max(mesh.reshape([-1, 3]), axis=0)
 
