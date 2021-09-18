@@ -64,7 +64,7 @@ def _equirect_color_func(path: str) -> Callable[[jnp.ndarray], jnp.ndarray]:
         )
         return img[y, x]
 
-    return jax.vmap(color_fn)
+    return jax.jit(jax.vmap(color_fn))
 
 
 def _rgb_color_func(mesh: jnp.ndarray) -> jnp.ndarray:
@@ -76,7 +76,7 @@ def _rgb_color_func(mesh: jnp.ndarray) -> jnp.ndarray:
             255 * (points - min_coord) / (max_coord - min_coord), 0, 255
         ).astype(jnp.uint8)
 
-    return color_fn
+    return jax.jit(color_fn)
 
 
 if __name__ == "__main__":
