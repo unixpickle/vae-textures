@@ -112,8 +112,8 @@ def _triangle_ray_collision(
     bary2 = invDet * (direction @ cross2)
     collides = jnp.logical_and(collides, jnp.logical_and(bary2 >= 0, bary2 <= 1))
 
-    bary3 = 1 - (bary1 + bary2)
-    collision_point = bary1 * t[0] + bary2 * t[1] + bary3 * t[3]
+    bary0 = 1 - (bary1 + bary2)
+    collision_point = bary1 * t[1] + bary2 * t[2] + bary0 * t[0]
 
     # Make sure this is in the positive part of the ray.
     scale = invDet * (v2 @ cross2)
