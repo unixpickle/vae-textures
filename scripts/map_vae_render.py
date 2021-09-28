@@ -25,6 +25,7 @@ def main():
             "checkerboard.jpg",
         ),
     )
+    parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--camera-x", default="1,0,0", type=str)
     parser.add_argument("--camera-y", default="0,1,0", type=str)
     parser.add_argument("--camera-depth", default="0,0,-1", type=str)
@@ -45,7 +46,7 @@ def main():
     def color_fn(x):
         gauss_points = enc(x)
         uniform_points = gauss_to_uniform(gauss_points)
-        return texture_fn(uniform_points)
+        return texture_fn((uniform_points + 1) / 2)
 
     rays = ray_grid(
         parse_vector(args.camera_x),
@@ -53,7 +54,9 @@ def main():
         parse_vector(args.camera_depth),
         args.resolution,
     )
-    colors = ray_cast(mesh, parse_vector(args.camera_origin), rays, color_fn)
+    colors = ray_cast(
+        mesh, parse_vector(args.camera_origin), rays, color_fn, batch_size=args.batch_size
+    )
     colors = (
         np.clip(np.array(colors) * 255, 0, 255)
         .astype(np.uint8)
