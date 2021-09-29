@@ -11,6 +11,7 @@ def ray_cast(
     color_fn: Callable[[jnp.ndarray], jnp.ndarray],
     batch_size: int = 128,
     bg_color: jnp.ndarray = None,
+    ambient_light: float = 0.0,
 ) -> jnp.ndarray:
     """
     Render a mesh by casting an array of rays from an origin point, finding
@@ -24,6 +25,7 @@ def ray_cast(
                        and returns the [B x 3] RGB colors at those coordinates.
     :param batch_size: the number of rays to evaluate at once.
     :param bg_color: the background color for non-collision rays.
+    :param ambient_light: the brightness regardless of normal direction.
     :return: an [R x 3] array of RGB colors.
     """
     # Normalize the directions so that dot products are meaningful.
@@ -37,7 +39,8 @@ def ray_cast(
             sub_directions
         )
         colors = color_fn(points)
-        colors *= jnp.sum(jnp.abs(normals * sub_directions), axis=-1, keepdims=True)
+        light_dot_prods = jnp.sum(jnp.abs(normals * sub_directions), axis=-1, keepdims=True)
+        colors = colors * (light_dot_prods * (1 - ambient_light) + ambient_light)
         return jnp.where(collides[:, None], colors, bg_color.astype(colors.dtype))
 
     outputs = []

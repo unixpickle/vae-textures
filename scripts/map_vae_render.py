@@ -31,6 +31,7 @@ def main():
     parser.add_argument("--camera-depth", default="0,0,-1", type=str)
     parser.add_argument("--camera-origin", default="0,0,2", type=str)
     parser.add_argument("--preserve-coords", action="store_true")
+    parser.add_argument("--ambient-light", default=0.1, type=float)
     parser.add_argument("mesh_in", type=str)
     parser.add_argument("img_out", type=str)
     args = parser.parse_args()
@@ -55,7 +56,12 @@ def main():
         args.resolution,
     )
     colors = ray_cast(
-        mesh, parse_vector(args.camera_origin), rays, color_fn, batch_size=args.batch_size
+        mesh,
+        parse_vector(args.camera_origin),
+        rays,
+        color_fn,
+        batch_size=args.batch_size,
+        ambient_light=args.ambient_light,
     )
     colors = (
         np.clip(np.array(colors) * 255, 0, 255)
@@ -71,7 +77,7 @@ def parse_vector(vec_str: str) -> jnp.ndarray:
 
 
 def image_color_fn(path: str) -> jnp.ndarray:
-    img = jnp.array(Image.open(path).convert("RGB"))
+    img = jnp.array(Image.open(path).convert("RGB")).astype(jnp.float32) / 255.0
 
     def color_fn(point: jnp.ndarray) -> jnp.ndarray:
         point = jnp.clip(point, 0, 1)
