@@ -73,7 +73,7 @@ def _rgb_color_func(mesh: jnp.ndarray) -> jnp.ndarray:
 
     def color_fn(points: jnp.ndarray) -> jnp.ndarray:
         return jnp.clip(
-            255 * (points - min_coord) / (max_coord - min_coord), 0, 255
+            255 * (points - min_coord) / (max_coord - min_coord) + 0.5, 0, 255
         ).astype(jnp.uint8)
 
     return jax.jit(color_fn)

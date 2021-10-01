@@ -64,7 +64,7 @@ def main():
         ambient_light=args.ambient_light,
     )
     colors = (
-        np.clip(np.array(colors) * 255, 0, 255)
+        np.clip(np.array(colors) * 255 + 0.5, 0, 255)
         .astype(np.uint8)
         .reshape([args.resolution, args.resolution, 3])
     )
